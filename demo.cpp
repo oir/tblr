@@ -6,6 +6,7 @@
 int main() {
   using namespace tblr;
 
+  // Disabling clang-format because of this bug: https://bugs.llvm.org/show_bug.cgi?id=45018
   // clang-format off
   { // Create a table and stream cell by cell. Use endr to end a row.
     Table t;
@@ -114,6 +115,28 @@ int main() {
     t << mini << mini << endr
       << mini << mini << endr;
 
+    std::cout << t << std::endl;
+  }
+
+  { // ANSI color code aware line breaks & width computation
+    const auto green = "\033[1;32m";
+    const auto underline = "\033[1;4m";
+    const auto clear = "\033[0m";
+
+    Table t;
+    t.layout(unicode_box_light());
+    t.widths({10, 10, 7})
+            .multiline(Space);
+    t << "animal" << "does what" << "when" << endr
+      << "dog" << "barks" << "angry" << endr
+      << "rooster" << "crows" << (Cell() << green << "in the cool breezy morning" << clear) << endr
+      << "computer" << "crashes" << (Cell() << underline << "at warm cozy night" << clear) << endr;
+    std::cout << t << std::endl;
+
+    t.multiline(Naive);
+    std::cout << t << std::endl;
+
+    t.multiline(SingleLine);
     std::cout << t << std::endl;
   }
 
