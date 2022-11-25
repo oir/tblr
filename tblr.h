@@ -42,34 +42,137 @@ class Endr {};
 const static Endr endr, endl;
 
 /** Is first byte of a UTF8 character */
-inline bool is_first_byte(const char& c) {
+inline bool is_first_byte(const char &c) {
   // https://stackoverflow.com/a/4063229
   return (c & 0xc0) != 0x80;
 }
 
 /** UTF8 length of a string */
-inline size_t len(const std::string& s) {
+inline size_t ulen(const std::string &s) {
   return std::count_if(s.begin(), s.end(), is_first_byte);
 }
 
+/** Find first ANSI escape code in string */
+inline std::tuple<size_t, size_t> find_ansi_esc(const std::string &s,
+                                                size_t pos = 0) {
+  const static std::string head("\x1b[");
+  while (pos < s.size()) {
+    size_t starter = s.find(head, pos);
+    if (starter == std::string::npos) {
+      return {std::string::npos, std::string::npos};
+    }
+    size_t i;
+    for (i = starter + head.size(); i < s.size(); i++) {
+      if (not((s[i] >= '0' and s[i] <= '9') or s[i] == ';')) {
+        break;
+      }
+    }
+    if (i >= s.size() or s[i] != 'm') {
+      // failed to close
+      pos = starter + head.size();
+      continue;
+    } else {
+      return {starter, i + 1 - starter};
+    }
+  }
+
+  return {std::string::npos, std::string::npos};
+}
+
+/** ANSI color code aware UTF8 length of a string */
+inline size_t clen(const std::string &s) {
+  size_t len_ = ulen(s);
+  for (size_t pos = 0; pos < s.size();) {
+    auto [left, size] = find_ansi_esc(s, pos);
+    if (left == std::string::npos) {
+      break;
+    }
+    len_ -= size;
+    pos = left + size;
+  }
+  return len_;
+}
+
+auto len = clen;
+
 /** UTF8 aware substring */
-inline std::string
-substr(const std::string& s, size_t left = 0, size_t size = -1) {
+inline std::string usubstr(const std::string &s, size_t left = 0,
+                           size_t size = -1) {
   auto i = s.begin();
-  for (left++; i != s.end() and (left -= is_first_byte(*i)); i++) {}
+  for (left++; i != s.end() and (left -= is_first_byte(*i)); i++) {
+  }
   auto pos = i;
-  for (size++; i != s.end() and (size -= is_first_byte(*i)); i++) {}
+  for (size++; i != s.end() and (size -= is_first_byte(*i)); i++) {
+  }
   return s.substr(pos - s.begin(), i - pos);
 }
 
+/// ANSI color code & UTF8 aware substring.
+/// This is quadratic but probably doesn't need to be fast for now, will
+/// optimize later.
+inline std::string substr(const std::string &s, size_t left = 0,
+                          size_t size = -1) {
+  size_t last_left = -1, first_right = -1;
+  for (size_t i = left; i < s.size(); i++) {
+    if (clen(s.substr(0, i)) == left) {
+      last_left = i;
+    }
+  }
+  for (size_t i = last_left; i < s.size(); i++) {
+    if (clen(s.substr(0, i)) == (left + size)) {
+      first_right = i;
+      break;
+    }
+  }
+  // collect all color codes until last_left
+  std::vector<std::string> openers;
+  for (size_t pos = 0; pos < last_left;) {
+    auto [l, sz] = find_ansi_esc(s, pos);
+    if (l + sz > last_left) {
+      break;
+    }
+    std::string code = s.substr(l, sz);
+    if (code == "\x1b[0m") { // reset code
+      openers.clear();
+    } else {
+      openers.push_back(code);
+    }
+    pos = l + sz;
+  }
+
+  // wrap around with color codes if exists
+  std::string rval;
+  for (auto &c : openers) {
+    rval += c;
+  }
+  rval += s.substr(last_left, first_right - last_left);
+  if (find_ansi_esc(rval) != std::tuple{std::string::npos, std::string::npos}) {
+    rval += "\x1b[0m";
+  }
+
+  return rval;
+}
+
+/// ANSI color code & utf8 aware version of rfind. Returns a character index
+/// instead of byte.
+size_t crfind(const std::string &s, char c) {
+  size_t pos = s.rfind(c);
+  if (pos == std::string::npos) {
+    return pos;
+  }
+  return clen(s.substr(0, pos));
+}
+
 /** Replace all appearances of "\r", "\r\n" with "\n" */
-std::string normalize_newlines(const std::string& s) {
+std::string normalize_newlines(const std::string &s) {
   std::string rval;
   rval.reserve(s.size());
 
   for (size_t i = 0; i < s.size(); i++) {
     if (s[i] == '\r') {
-      if (i < (s.size() - 1) and s[i + 1] == '\n') { i++; }
+      if (i < (s.size() - 1) and s[i + 1] == '\n') {
+        i++;
+      }
       rval += '\n';
     } else {
       rval += s[i];
@@ -82,17 +185,15 @@ std::string normalize_newlines(const std::string& s) {
 /// Helper class to use stream operator (<<) without moving to the next column,
 /// piping into the same cell of the table.
 class Cell {
- private:
+private:
   std::stringstream ss_;
 
- public:
-  template <typename T>
-  friend Cell& operator<<(Cell& c, const T& x) {
+public:
+  template <typename T> friend Cell &operator<<(Cell &c, const T &x) {
     c.ss_ << x;
     return c;
   }
-  template <typename T>
-  friend Cell&& operator<<(Cell&& c, const T& x) {
+  template <typename T> friend Cell &&operator<<(Cell &&c, const T &x) {
     c.ss_ << x;
     return std::move(c);
   }
@@ -108,73 +209,71 @@ struct ColSeparators {
 
 /** Base class for row delimiters (horizontal lines between rows). */
 class RowSeparator {
- public:
+public:
   /// Print row separator to stream.
   /// @param  out          Output stream to print
   /// @param  spec_widths  User specified widths of each column
   /// @param  widths       Computed widths of each column (from content text)
   /// @param  aligns       User specified alignments of each column
-  virtual void print(std::ostream& out,
-                     const Widths& spec_widths,
-                     const Widths& widths,
-                     const Aligns& aligns) const = 0;
+  virtual void print(std::ostream &out, const Widths &spec_widths,
+                     const Widths &widths, const Aligns &aligns) const = 0;
 
   virtual ~RowSeparator() {}
 };
 
 /** A row separator that does not align to columns (e.g. Latex's \hline). */
 class RowSeparatorFlat : public RowSeparator {
- private:
+private:
   std::string sepr_;
 
- public:
+public:
   RowSeparatorFlat(std::string sepr = "") : sepr_(std::move(sepr)) {}
 
-  void print(std::ostream& out,
-             const Widths& /*spec_widths*/,
-             const Widths& /*widths*/,
-             const Aligns& /*aligns*/) const override {
+  void print(std::ostream &out, const Widths & /*spec_widths*/,
+             const Widths & /*widths*/,
+             const Aligns & /*aligns*/) const override {
     out << sepr_ << std::endl;
   }
 };
 
 /** Empty row separator, does not add any line between two consecutive rows. */
 class RowSeparatorEmpty : public RowSeparator {
- public:
-  void print(std::ostream& /*out*/,
-             const Widths& /*spec_widths*/,
-             const Widths& /*widths*/,
-             const Aligns& /*aligns*/) const override {}
+public:
+  void print(std::ostream & /*out*/, const Widths & /*spec_widths*/,
+             const Widths & /*widths*/,
+             const Aligns & /*aligns*/) const override {}
 };
 
 /// A row separator that has column separators within that aligns to each
 /// cell/column (e.g. Markdown)
 class RowSeparatorColwise : public RowSeparator {
- private:
+private:
   ColSeparators col_sepr_;
   std::string filler_;
 
- public:
+public:
   RowSeparatorColwise(ColSeparators csep = {}, std::string fill = " ")
       : col_sepr_(std::move(csep)), filler_(std::move(fill)) {
     assert(not filler_.empty());
   }
 
-  void print(std::ostream& out,
-             const Widths& spec_widths,
-             const Widths& widths,
-             const Aligns& /*aligns*/) const override {
-    static auto extend = [](const std::string& s, const size_t width) {
+  void print(std::ostream &out, const Widths &spec_widths, const Widths &widths,
+             const Aligns & /*aligns*/) const override {
+    static auto extend = [](const std::string &s, const size_t width) {
       std::string rval;
       size_t lens = len(s);
-      for (size_t _ = 0; _ < width / lens; _++) { rval += s; }
+      for (size_t _ = 0; _ < width / lens; _++) {
+        rval += s;
+      }
       rval += substr(s, 0, width % lens);
       return rval;
     };
 
     out << col_sepr_.left;
     for (size_t i = 0; i < widths.size(); i++) {
-      if (i > 0) { out << col_sepr_.mid; }
+      if (i > 0) {
+        out << col_sepr_.mid;
+      }
       size_t width = (i < spec_widths.size() and spec_widths[i] > 0)
                          ? spec_widths[i]
                          : widths[i];
@@ -210,17 +309,17 @@ struct Layout {
 
 /** Main class that defines a table with its layout and content. */
 class Table {
- public:
+public:
   /// A collection of rows of a table, which contain the text content.
   /// See Row.
   using Grid = std::vector<Row>;
 
- private:
+private:
   Grid data_;
   Row cur_row_;
 
-  Widths spec_widths_; /**< Specified widths of each column */
-  Aligns spec_aligns_; /**< Specified alignment of each column */
+  Widths spec_widths_;         /**< Specified widths of each column */
+  Aligns spec_aligns_;         /**< Specified alignment of each column */
   LineSplitter split_ = Naive; /** Line splitting method */
   Layout layout_; /** Layout definition of the table, see <Layout>. */
 
@@ -229,7 +328,8 @@ class Table {
   Widths widths_;
   // bool printed_any_row_ = false; //TODO: to be used in online mode
 
-  std::stringstream ss_;
+  int precision_ = -1;
+  bool fixed_ = false;
 
   // Helpers
 
@@ -240,82 +340,80 @@ class Table {
 
   /// - Single line (does not have \n in it)
   /// - s.size() <= width
-  static void aligned_print_(std::ostream& out,
-                             const std::string& s,
-                             size_t width,
-                             Align align);
+  static void aligned_print_(std::ostream &out, const std::string &s,
+                             size_t width, Align align);
   /// Print a string in the given width and alignment, and
   /// return the remaining suffix string that did not fit in width.
-  static std::string print_(std::ostream& out,
-                            const std::string& s,
-                            size_t width,
-                            Align align,
-                            LineSplitter ls);
+  static std::string print_(std::ostream &out, const std::string &s,
+                            size_t width, Align align, LineSplitter ls);
   /// Print _single_ line of a row. A row can contain multiple lines if
   /// multiline is enabled.
-  Row print_row_line_(std::ostream& out, const Row& row) const;
+  Row print_row_line_(std::ostream &out, const Row &row) const;
 
   /** Print a row. If the row has multiple lines, prints all of them. */
-  void print_row_(std::ostream& out, const Row& row) const;
+  void print_row_(std::ostream &out, const Row &row) const;
 
- public:
+public:
   /// Set widths of each column. Zero means auto. If there are more
   /// columns than widths, underspecified columns default to zero.
-  Table& widths(Widths widths_) {
-    spec_widths_ = std::move(widths_);
+  Table &widths(Widths widths) {
+    spec_widths_ = std::move(widths);
     return *this;
   }
   /// Set alignments of each column. If there are more columns than
   /// alignments, underspecified columns default to Left.
-  Table& aligns(Aligns aligns_) {
-    spec_aligns_ = std::move(aligns_);
+  Table &aligns(Aligns aligns) {
+    spec_aligns_ = std::move(aligns);
     return *this;
   }
   /** Set multilineness (line splitter) of table. */
-  Table& multiline(LineSplitter mline) {
+  Table &multiline(LineSplitter mline) {
     split_ = std::move(mline);
     return *this;
   }
   /** Set layout of table. */
-  Table& layout(Layout layout) {
+  Table &layout(Layout layout) {
     layout_ = std::move(layout);
     return *this;
   }
   /** Set floating point precision. */
-  Table& precision(const int n) {
-    ss_ << std::setprecision(n);
+  Table &precision(const int n) {
+    precision_ = n;
     return *this;
   }
   /** Set fixed notation for printing floats (as opposed to default). */
-  Table& fixed() {
-    ss_ << std::fixed;
+  Table &fixed() {
+    fixed_ = true;
     return *this;
   }
 
   /// Stream operator to pipe things _into_ the table.
   /// General (unspecialized) version assumes input is streamable to a stream
   /// and puts it into the next cell by converting it to string.
-  template <typename T>
-  Table& operator<<(const T& x);
+  template <typename T> Table &operator<<(const T &x);
 
   /// Print the table. This is the final method to call after table contents are
   /// populated and ready to be displayed / output.
-  void print(std::ostream& out = std::cout) const;
+  void print(std::ostream &out = std::cout) const;
 };
 
-template <typename T>
-Table& Table::operator<<(const T& x) {
+template <typename T> Table &Table::operator<<(const T &x) {
   // insert the value into the table as a string
-  ss_ << x;
-  ss_.str(normalize_newlines(ss_.str()));
-  cur_row_.push_back(ss_.str());
+  std::stringstream ss;
+  if (precision_ > -1) {
+    ss << std::setprecision(precision_);
+  }
+  if (fixed_) {
+    ss << std::fixed;
+  }
+  ss << x;
+  ss.str(normalize_newlines(ss.str()));
+  cur_row_.push_back(ss.str());
 
   widths_.resize(std::max(widths_.size(), cur_row_.size()), 0);
-  size_t& width = widths_[cur_row_.size() - 1];
-  for (std::string s; std::getline(ss_, s); width = std::max(width, len(s))) {}
-
-  ss_.str("");
-  ss_.clear();
+  size_t &width = widths_[cur_row_.size() - 1];
+  for (std::string s; std::getline(ss, s); width = std::max(width, len(s))) {
+  }
 
   return *this;
 }
@@ -327,23 +425,19 @@ Table& Table::operator<<(const T& x) {
 /// ~~~~{.cpp}
 /// t << "hello" << "world" << tblr::endr;
 /// ~~~~
-template <>
-inline Table& Table::operator<<(const Endr&) {
+template <> inline Table &Table::operator<<(const Endr &) {
   data_.push_back(std::move(cur_row_));
   return *this;
 }
 
 /// Specialization of the stream operator for <Cells>. Puts the cell contents
 /// into the next cell.
-template <>
-inline Table& Table::operator<<(const Cell& c) {
+template <> inline Table &Table::operator<<(const Cell &c) {
   return *this << normalize_newlines(c.str());
 }
 
-inline void Table::aligned_print_(std::ostream& out,
-                                  const std::string& s,
-                                  size_t width,
-                                  Align align) {
+inline void Table::aligned_print_(std::ostream &out, const std::string &s,
+                                  size_t width, Align align) {
   size_t lens = len(s);
   assert(lens <= width and
          s.find('\n') == std::string::npos); // paranoid ¯\_(ツ)_/¯
@@ -358,11 +452,8 @@ inline void Table::aligned_print_(std::ostream& out,
   }
 }
 
-inline std::string Table::print_(std::ostream& out,
-                                 const std::string& s,
-                                 size_t width,
-                                 Align align,
-                                 LineSplitter ls) {
+inline std::string Table::print_(std::ostream &out, const std::string &s,
+                                 size_t width, Align align, LineSplitter ls) {
   std::string head = s;
   std::string tail = "";
 
@@ -379,10 +470,13 @@ inline std::string Table::print_(std::ostream& out,
     tail = substr(s, width);
     if (ls == Space) {
       // split by space
-      pos = head.rfind(' ');
+      // pos = head.rfind(' ');
+      pos = crfind(head, ' ');
       if (pos != std::string::npos) {
-        head = s.substr(0, pos);
-        tail = s.substr(pos + 1);
+        // head = s.substr(0, pos);
+        // tail = s.substr(pos + 1);
+        head = substr(s, 0, pos);
+        tail = substr(s, pos + 1);
       }
     }
   }
@@ -391,11 +485,13 @@ inline std::string Table::print_(std::ostream& out,
   return (ls == SingleLine) ? "" : tail;
 }
 
-inline Row Table::print_row_line_(std::ostream& out, const Row& row) const {
+inline Row Table::print_row_line_(std::ostream &out, const Row &row) const {
   Row rval;
   out << layout_.col_sepr.left;
   for (size_t i = 0; i < row.size(); i++) {
-    if (i > 0) { out << layout_.col_sepr.mid; }
+    if (i > 0) {
+      out << layout_.col_sepr.mid;
+    }
     size_t width = (i < spec_widths_.size() and spec_widths_[i] > 0)
                        ? spec_widths_[i]
                        : widths_[i];
@@ -406,18 +502,19 @@ inline Row Table::print_row_line_(std::ostream& out, const Row& row) const {
   return rval;
 }
 
-inline void Table::print_row_(std::ostream& out, const Row& row) const {
-  static auto empty = [](const Row& row) {
-    return std::all_of(
-        row.begin(), row.end(), std::mem_fn(&std::string::empty));
+inline void Table::print_row_(std::ostream &out, const Row &row) const {
+  static auto empty = [](const Row &row) {
+    return std::all_of(row.begin(), row.end(),
+                       [](const std::string &s) { return s.empty(); });
   };
 
   Row rval = row;
-  while (not empty(rval = print_row_line_(out, rval))) {}
+  while (not empty(rval = print_row_line_(out, rval))) {
+  }
 }
 
-inline void Table::print(std::ostream& out) const {
-  auto& row_sepr = layout_.row_sepr;
+inline void Table::print(std::ostream &out) const {
+  auto &row_sepr = layout_.row_sepr;
   row_sepr.top->print(out, spec_widths_, widths_, spec_aligns_);
   for (size_t i = 0; i < data_.size(); i++) {
     if (i == 1) {
@@ -432,7 +529,7 @@ inline void Table::print(std::ostream& out) const {
 
 /// Stream operator to stream a table to an output stream. Alternative to
 /// calling <Table::print> explicitly.
-inline std::ostream& operator<<(std::ostream& os, const Table& t) {
+inline std::ostream &operator<<(std::ostream &os, const Table &t) {
   t.print(os);
   return os;
 }
@@ -441,12 +538,9 @@ inline std::ostream& operator<<(std::ostream& os, const Table& t) {
 
 /// Creates a simple layout with specified border elements. Row separators align
 /// to columns.
-inline Layout simple_border(std::string left,
-                            std::string center,
-                            std::string right,
-                            std::string top,
-                            std::string header_mid,
-                            std::string mid,
+inline Layout simple_border(std::string left, std::string center,
+                            std::string right, std::string top,
+                            std::string header_mid, std::string mid,
                             std::string bottom) {
   ColSeparators cs{std::move(left), std::move(center), std::move(right)};
   RowSeparators rs{
@@ -460,10 +554,8 @@ inline Layout simple_border(std::string left,
 /// Creates a simple layout with specified column separators and only
 /// a single row separator between the header
 /// and the rest of the table. Separator aligns to columns.
-inline Layout simple_border(std::string left,
-                            std::string center,
-                            std::string right,
-                            std::string header_mid) {
+inline Layout simple_border(std::string left, std::string center,
+                            std::string right, std::string header_mid) {
   ColSeparators cs{std::move(left), std::move(center), std::move(right)};
   RowSeparators rs{
       std::make_shared<RowSeparatorEmpty>(),
@@ -475,8 +567,8 @@ inline Layout simple_border(std::string left,
 
 /// Creates a simple layout with specified column separators and no row
 /// separators.
-inline Layout
-simple_border(std::string left, std::string center, std::string right) {
+inline Layout simple_border(std::string left, std::string center,
+                            std::string right) {
   ColSeparators cs{std::move(left), std::move(center), std::move(right)};
   RowSeparators rs{std::make_shared<RowSeparatorEmpty>(),
                    std::make_shared<RowSeparatorEmpty>(),
@@ -485,25 +577,22 @@ simple_border(std::string left, std::string center, std::string right) {
   return {std::move(cs), std::move(rs)};
 }
 
-/// Creates layout with markdown table syntax. Resulting table can be copy pasted
-/// into markdown. Markdown specific alignment syntax is not yet supported.
-inline Layout markdown() {
-  return simple_border("| ", " | ", " |", "-");
-}
+/// Creates layout with markdown table syntax. Resulting table can be copy
+/// pasted into markdown. Markdown specific alignment syntax is not yet
+/// supported.
+inline Layout markdown() { return simple_border("| ", " | ", " |", "-"); }
 
 /** Creates a very basic indented list layout with whitespace delimiters. */
-inline Layout indented_list() {
-  return simple_border("  ", "   ", "");
-}
+inline Layout indented_list() { return simple_border("  ", "   ", ""); }
 
 class LatexHeader : public RowSeparator {
- public:
-  void print(std::ostream& out,
-             const Widths& /*spec_widths*/,
-             const Widths& /*widths*/,
-             const Aligns& aligns) const override {
+public:
+  void print(std::ostream &out, const Widths & /*spec_widths*/,
+             const Widths & /*widths*/, const Aligns &aligns) const override {
     out << R"(\begin{tabular}{)";
-    for (auto& a : aligns) { out << (char)a; }
+    for (auto &a : aligns) {
+      out << (char)a;
+    }
     out << "}" << std::endl << R"(\hline)" << std::endl;
   }
 };
