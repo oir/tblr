@@ -444,5 +444,85 @@ TEST_CASE("Edge Cases", "[edge]") {
     check(t, expected);
   }
 }
+// clang-format on
 
+std::string strip_ansi(const std::string& s) {
+  std::string rval;
+  size_t begin = 0;
+  auto [left, size] = tblr::find_ansi_esc(s);
+  while (left != std::string::npos) {
+    rval += s.substr(begin, left - begin);
+    begin = left + size;
+    std::tie(left, size) = tblr::find_ansi_esc(s, begin);
+  }
+  rval += s.substr(begin);
+  return rval;
+}
+
+TEST_CASE("ANSI color & styling", "[color]") {
+  using namespace tblr;
+  const auto green = "\033[1;32m";
+  const auto red = "\033[1;31m";
+  const auto blue = "\033[1;34m";
+  const auto underline = "\033[1;4m";
+  const auto clear = "\033[0m";
+
+  auto mlin = GENERATE(Space, Naive, SingleLine);
+
+  Table t;
+  t.layout(unicode_box_light());
+  t.widths({10, 10, 7}).multiline(mlin);
+  // clang-format off
+  t << "animal" << "does what" << "when" << endr
+    << "dog" << "barks" << "angry" << endr
+    << "rooster" << "crows"
+                 << (Cell() << green << "in the cool breezy morning" << clear)
+                 << endr
+    << "computer" << "crashes"
+                  << (Cell() << underline << red << "at warm co"
+                             << blue << "zy night" << clear)
+                  << endr;
+  // clang-format on
+
+  SECTION("Text content") {
+    Table plain;
+    plain.layout(unicode_box_light());
+    plain.widths({10, 10, 7}).multiline(mlin);
+    // clang-format off
+    plain << "animal" << "does what" << "when" << endr
+          << "dog" << "barks" << "angry" << endr
+          << "rooster" << "crows" << "in the cool breezy morning" << endr
+          << "computer" << "crashes" << "at warm cozy night" << endr;
+    // clang-format on
+
+    // Check that raw text content of the styled table is the same as plain
+    // table
+    CHECK(strip_ansi(t) == std::string(plain));
+  }
+
+  SECTION("Output") {
+    if (mlin == Space) {
+      t.aligns({Left, Left, Right});
+      std::string expected =
+          "┌──────────┬──────────┬───────┐\n"
+          "│animal    │does what │   when│\n"
+          "├──────────┼──────────┼───────┤\n"
+          "│dog       │barks     │  angry│\n"
+          "├──────────┼──────────┼───────┤\n"
+          "│rooster   │crows     │ [1;32min the[0m│\n"
+          "│          │          │   [1;32mcool[0m│\n"
+          "│          │          │ [1;32mbreezy[0m│\n"
+          "│          │          │[1;32mmorning[0m│\n"
+          "├──────────┼──────────┼───────┤\n"
+          "│computer  │crashes   │     [1;4m[1;31mat[0m│\n"
+          "│          │          │   [1;4m[1;31mwarm[0m│\n"
+          "│          │          │   [1;4m[1;31mco[1;34mzy[0m│\n"
+          "│          │          │  [1;4m[1;31m[1;34mnight[0m│\n"
+          "└──────────┴──────────┴───────┘\n";
+      CHECK(expected == std::string(t));
+    }
+  }
+}
+
+// clang-format off
 // clang-format on
