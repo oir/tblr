@@ -6,23 +6,23 @@
 #include <catch.hpp>
 #include <tblr.h>
 
-// clang-format off
-
 TEST_CASE("Basic Layout", "[basic]") {
   SECTION("basic") {
     using namespace tblr;
     Table t;
-    t.widths({15, 6, 6, 7})
-     .aligns({Left, Center, Center, Center});
+    t.widths({15, 6, 6, 7}).aligns({Left, Center, Center, Center});
+    // Disabling clang-format because of this bug:
+    // https://bugs.llvm.org/show_bug.cgi?id=45018
+    // clang-format off
     t << "Model" << "Precision" << "Recall" << "F-score" << endr
       << (Cell() << "my" << "Model" << 1) << 0.1 << 0.2 << 0.3 << endr
       << "a model 3" << 0.4 << 0.5 << 0.6 << endr;
-    
-    std::string expected =
-      "Model           Precis Recall F-score\n"
-      "                 ion                 \n"
-      "myModel1         0.1    0.2     0.3  \n"
-      "a model 3        0.4    0.5     0.6  \n";
+    // clang-format on
+
+    std::string expected = "Model           Precis Recall F-score\n"
+                           "                 ion                 \n"
+                           "myModel1         0.1    0.2     0.3  \n"
+                           "a model 3        0.4    0.5     0.6  \n";
 
     std::stringstream ss;
     t.print(ss);
@@ -32,28 +32,22 @@ TEST_CASE("Basic Layout", "[basic]") {
   SECTION("multiline with space") {
     using namespace tblr;
     Table t;
-    t.widths({30, 15})
-     .aligns({Left, Left})
-     .multiline(Space);
+    t.widths({30, 15}).aligns({Left, Left}).multiline(Space);
     t << "a function that is continuous everywhere and"
          " differentiable nowhere"
-      << "weierstrass function"
-      << endr;
+      << "weierstrass function" << endr;
     t << "an uncountable set of points that have zero length"
-      << "cantor set"
-      << endr;
+      << "cantor set" << endr;
     t << "a continuous curve that covers the entire unit square"
-      << "peano curve"
-      << endr;
+      << "peano curve" << endr;
 
-    std::string expected =
-      "a function that is continuous  weierstrass    \n"
-      "everywhere and differentiable  function       \n"
-      "nowhere                                       \n"
-      "an uncountable set of points   cantor set     \n"
-      "that have zero length                         \n"
-      "a continuous curve that        peano curve    \n"
-      "covers the entire unit square                 \n";
+    std::string expected = "a function that is continuous  weierstrass    \n"
+                           "everywhere and differentiable  function       \n"
+                           "nowhere                                       \n"
+                           "an uncountable set of points   cantor set     \n"
+                           "that have zero length                         \n"
+                           "a continuous curve that        peano curve    \n"
+                           "covers the entire unit square                 \n";
 
     std::stringstream ss;
     t.print(ss);
@@ -63,26 +57,23 @@ TEST_CASE("Basic Layout", "[basic]") {
   SECTION("multiline with space long") {
     using namespace tblr;
     Table t;
-    t.widths({2, 10})
-     .aligns({Left, Left})
-     .multiline(Space);
-    t << 1 << "short loooooong" << endr
-      << 2 << "short loooooooong" << endr
-      << 3 << "short loooooooong short" << endr
-      << 4 << "short loooooooong short short" << endr;
-    std::string expected =
-      "1  short     \n"
-      "   loooooong \n"
-      "2  short     \n"
-      "   loooooooon\n"
-      "   g         \n"
-      "3  short     \n"
-      "   loooooooon\n"
-      "   g short   \n"
-      "4  short     \n"
-      "   loooooooon\n"
-      "   g short   \n"
-      "   short     \n";
+    t.widths({2, 10}).aligns({Left, Left}).multiline(Space);
+    t << 1 << "short loooooong" << endr                //
+      << 2 << "short loooooooong" << endr              //
+      << 3 << "short loooooooong short" << endr        //
+      << 4 << "short loooooooong short short" << endr; //
+    std::string expected = "1  short     \n"
+                           "   loooooong \n"
+                           "2  short     \n"
+                           "   loooooooon\n"
+                           "   g         \n"
+                           "3  short     \n"
+                           "   loooooooon\n"
+                           "   g short   \n"
+                           "4  short     \n"
+                           "   loooooooon\n"
+                           "   g short   \n"
+                           "   short     \n";
 
     std::stringstream ss;
     ss << t;
@@ -96,21 +87,22 @@ TEST_CASE("Custom Layout", "[custom]") {
   SECTION("single line") {
     tblr::Table t;
     t.widths({15, 5})
-     .aligns({tblr::Left, tblr::Right})
-     .multiline(tblr::SingleLine)
-     .layout(layout);
+        .aligns({tblr::Left, tblr::Right})
+        .multiline(tblr::SingleLine)
+        .layout(layout);
+    // clang-format off
     t << "Model" << "Precision" << "Recall" << "F-score" << tblr::endr
       << (tblr::Cell() << "my" << "Model" << 1) << 0.1 << 0.2 << 0.3 << tblr::endr
       << "a model 3" << 0.4 << 0.5 << 0.6 << tblr::endr;
+    // clang-format on
 
-    std::string expected =
-      "| ^^^^^^^^^^^^^^^ | ^^^^^ | ^^^^^^ | ^^^^^^^ |\n"
-      "| Model           | Preci | Recall | F-score |\n"
-      "| =============== | ===== | ====== | ======= |\n"
-      "| myModel1        |   0.1 | 0.2    | 0.3     |\n"
-      "| --------------- | ----- | ------ | ------- |\n"
-      "| a model 3       |   0.4 | 0.5    | 0.6     |\n"
-      "| vVvVvVvVvVvVvVv | vVvVv | vVvVvV | vVvVvVv |\n";
+    std::string expected = "| ^^^^^^^^^^^^^^^ | ^^^^^ | ^^^^^^ | ^^^^^^^ |\n"
+                           "| Model           | Preci | Recall | F-score |\n"
+                           "| =============== | ===== | ====== | ======= |\n"
+                           "| myModel1        |   0.1 | 0.2    | 0.3     |\n"
+                           "| --------------- | ----- | ------ | ------- |\n"
+                           "| a model 3       |   0.4 | 0.5    | 0.6     |\n"
+                           "| vVvVvVvVvVvVvVv | vVvVv | vVvVvV | vVvVvVv |\n";
 
     std::stringstream ss;
     t.print(ss);
@@ -120,22 +112,21 @@ TEST_CASE("Custom Layout", "[custom]") {
   SECTION("multiline") {
     using namespace tblr;
     Table t;
-    t.widths({15, 5})
-     .aligns({Left, Right})
-     .layout(layout);
+    t.widths({15, 5}).aligns({Left, Right}).layout(layout);
+    // clang-format off
     t << "Model" << "Precision" << "Rec\nall\n" << "F-score" << endr
       << (Cell() << "my" << "Model" << 1) << 0.1 << 0.2 << 0.3 << endr
       << "a model 3" << 0.4 << 0.5 << 0.6 << endr;
+    // clang-format on
 
-    std::string expected =
-      "| ^^^^^^^^^^^^^^^ | ^^^^^ | ^^^ | ^^^^^^^ |\n"
-      "| Model           | Preci | Rec | F-score |\n"
-      "|                 |  sion | all |         |\n"
-      "| =============== | ===== | === | ======= |\n"
-      "| myModel1        |   0.1 | 0.2 | 0.3     |\n"
-      "| --------------- | ----- | --- | ------- |\n"
-      "| a model 3       |   0.4 | 0.5 | 0.6     |\n"
-      "| vVvVvVvVvVvVvVv | vVvVv | vVv | vVvVvVv |\n";
+    std::string expected = "| ^^^^^^^^^^^^^^^ | ^^^^^ | ^^^ | ^^^^^^^ |\n"
+                           "| Model           | Preci | Rec | F-score |\n"
+                           "|                 |  sion | all |         |\n"
+                           "| =============== | ===== | === | ======= |\n"
+                           "| myModel1        |   0.1 | 0.2 | 0.3     |\n"
+                           "| --------------- | ----- | --- | ------- |\n"
+                           "| a model 3       |   0.4 | 0.5 | 0.6     |\n"
+                           "| vVvVvVvVvVvVvVv | vVvVv | vVv | vVvVvVv |\n";
 
     std::stringstream ss;
     t.print(ss);
@@ -145,23 +136,22 @@ TEST_CASE("Custom Layout", "[custom]") {
   SECTION("extra line") {
     using namespace tblr;
     Table t;
-    t.widths({15, 5})
-     .aligns({Left, Right})
-     .layout(layout);
+    t.widths({15, 5}).aligns({Left, Right}).layout(layout);
+    // clang-format off
     t << "Model" << "Precision" << "Rec\nall\n\n" << "F-score" << endr
       << (Cell() << "my" << "Model" << 1) << 0.1 << 0.2 << 0.3 << endr
       << "a model 3" << 0.4 << 0.5 << 0.6 << endr;
+    // clang-format on
 
-    std::string expected =
-      "| ^^^^^^^^^^^^^^^ | ^^^^^ | ^^^ | ^^^^^^^ |\n"
-      "| Model           | Preci | Rec | F-score |\n"
-      "|                 |  sion | all |         |\n"
-      "|                 |       |     |         |\n"
-      "| =============== | ===== | === | ======= |\n"
-      "| myModel1        |   0.1 | 0.2 | 0.3     |\n"
-      "| --------------- | ----- | --- | ------- |\n"
-      "| a model 3       |   0.4 | 0.5 | 0.6     |\n"
-      "| vVvVvVvVvVvVvVv | vVvVv | vVv | vVvVvVv |\n";
+    std::string expected = "| ^^^^^^^^^^^^^^^ | ^^^^^ | ^^^ | ^^^^^^^ |\n"
+                           "| Model           | Preci | Rec | F-score |\n"
+                           "|                 |  sion | all |         |\n"
+                           "|                 |       |     |         |\n"
+                           "| =============== | ===== | === | ======= |\n"
+                           "| myModel1        |   0.1 | 0.2 | 0.3     |\n"
+                           "| --------------- | ----- | --- | ------- |\n"
+                           "| a model 3       |   0.4 | 0.5 | 0.6     |\n"
+                           "| vVvVvVvVvVvVvVv | vVvVv | vVv | vVvVvVv |\n";
 
     std::stringstream ss;
     t.print(ss);
@@ -171,23 +161,22 @@ TEST_CASE("Custom Layout", "[custom]") {
   SECTION("extra line cr") {
     using namespace tblr;
     Table t;
-    t.widths({15, 5})
-     .aligns({Left, Right})
-     .layout(layout);
+    t.widths({15, 5}).aligns({Left, Right}).layout(layout);
+    // clang-format off
     t << "Model" << "Precision" << "Rec\rall\r\r" << "F-score" << endr
       << (Cell() << "my" << "Model" << 1) << 0.1 << 0.2 << 0.3 << endr
       << "a model 3" << 0.4 << 0.5 << 0.6 << endr;
+    // clang-format on
 
-    std::string expected =
-      "| ^^^^^^^^^^^^^^^ | ^^^^^ | ^^^ | ^^^^^^^ |\n"
-      "| Model           | Preci | Rec | F-score |\n"
-      "|                 |  sion | all |         |\n"
-      "|                 |       |     |         |\n"
-      "| =============== | ===== | === | ======= |\n"
-      "| myModel1        |   0.1 | 0.2 | 0.3     |\n"
-      "| --------------- | ----- | --- | ------- |\n"
-      "| a model 3       |   0.4 | 0.5 | 0.6     |\n"
-      "| vVvVvVvVvVvVvVv | vVvVv | vVv | vVvVvVv |\n";
+    std::string expected = "| ^^^^^^^^^^^^^^^ | ^^^^^ | ^^^ | ^^^^^^^ |\n"
+                           "| Model           | Preci | Rec | F-score |\n"
+                           "|                 |  sion | all |         |\n"
+                           "|                 |       |     |         |\n"
+                           "| =============== | ===== | === | ======= |\n"
+                           "| myModel1        |   0.1 | 0.2 | 0.3     |\n"
+                           "| --------------- | ----- | --- | ------- |\n"
+                           "| a model 3       |   0.4 | 0.5 | 0.6     |\n"
+                           "| vVvVvVvVvVvVvVv | vVvVv | vVv | vVvVvVv |\n";
 
     std::stringstream ss;
     t.print(ss);
@@ -197,23 +186,22 @@ TEST_CASE("Custom Layout", "[custom]") {
   SECTION("extra line crlf") {
     using namespace tblr;
     Table t;
-    t.widths({15, 5})
-     .aligns({Left, Right})
-     .layout(layout);
+    t.widths({15, 5}).aligns({Left, Right}).layout(layout);
+    // clang-format off
     t << "Model" << "Precision" << "Rec\r\nall\r\n\r\n" << "F-score" << endr
       << (Cell() << "my" << "Model" << 1) << 0.1 << 0.2 << 0.3 << endr
       << "a model 3" << 0.4 << 0.5 << 0.6 << endr;
+    // clang-format on
 
-    std::string expected =
-      "| ^^^^^^^^^^^^^^^ | ^^^^^ | ^^^ | ^^^^^^^ |\n"
-      "| Model           | Preci | Rec | F-score |\n"
-      "|                 |  sion | all |         |\n"
-      "|                 |       |     |         |\n"
-      "| =============== | ===== | === | ======= |\n"
-      "| myModel1        |   0.1 | 0.2 | 0.3     |\n"
-      "| --------------- | ----- | --- | ------- |\n"
-      "| a model 3       |   0.4 | 0.5 | 0.6     |\n"
-      "| vVvVvVvVvVvVvVv | vVvVv | vVv | vVvVvVv |\n";
+    std::string expected = "| ^^^^^^^^^^^^^^^ | ^^^^^ | ^^^ | ^^^^^^^ |\n"
+                           "| Model           | Preci | Rec | F-score |\n"
+                           "|                 |  sion | all |         |\n"
+                           "|                 |       |     |         |\n"
+                           "| =============== | ===== | === | ======= |\n"
+                           "| myModel1        |   0.1 | 0.2 | 0.3     |\n"
+                           "| --------------- | ----- | --- | ------- |\n"
+                           "| a model 3       |   0.4 | 0.5 | 0.6     |\n"
+                           "| vVvVvVvVvVvVvVv | vVvVv | vVv | vVvVvVv |\n";
 
     std::stringstream ss;
     t.print(ss);
@@ -223,23 +211,22 @@ TEST_CASE("Custom Layout", "[custom]") {
   SECTION("zero width") {
     using namespace tblr;
     Table t;
-    t.widths({0, 5})
-     .aligns({Left, Right})
-     .layout(layout);
+    t.widths({0, 5}).aligns({Left, Right}).layout(layout);
+    // clang-format off
     t << "Model" << "Precision" << "Rec\nall\n\n" << "F-score" << endr
       << (Cell() << "my" << "Model" << 1) << 0.1 << 0.2 << 0.3 << endr
       << "a model 3" << 0.4 << 0.5 << 0.6 << endr;
+    // clang-format on
 
-    std::string expected =
-      "| ^^^^^^^^^ | ^^^^^ | ^^^ | ^^^^^^^ |\n"
-      "| Model     | Preci | Rec | F-score |\n"
-      "|           |  sion | all |         |\n"
-      "|           |       |     |         |\n"
-      "| ========= | ===== | === | ======= |\n"
-      "| myModel1  |   0.1 | 0.2 | 0.3     |\n"
-      "| --------- | ----- | --- | ------- |\n"
-      "| a model 3 |   0.4 | 0.5 | 0.6     |\n"
-      "| vVvVvVvVv | vVvVv | vVv | vVvVvVv |\n";
+    std::string expected = "| ^^^^^^^^^ | ^^^^^ | ^^^ | ^^^^^^^ |\n"
+                           "| Model     | Preci | Rec | F-score |\n"
+                           "|           |  sion | all |         |\n"
+                           "|           |       |     |         |\n"
+                           "| ========= | ===== | === | ======= |\n"
+                           "| myModel1  |   0.1 | 0.2 | 0.3     |\n"
+                           "| --------- | ----- | --- | ------- |\n"
+                           "| a model 3 |   0.4 | 0.5 | 0.6     |\n"
+                           "| vVvVvVvVv | vVvVv | vVv | vVvVvVv |\n";
 
     std::stringstream ss;
     t.print(ss);
@@ -254,17 +241,18 @@ TEST_CASE("Predefined Custom Layout", "[predefined]") {
     Table t;
     t.layout(markdown());
 
+    // clang-format off
     t << "things to do" << "when" << endr
       << "give you up" << "never" << endr
       << "let you down" << "never" << endr
       << "run around and desert you" << "never" << endr;
+    // clang-format on
 
-    std::string expected =
-      "| things to do              | when  |\n"
-      "| ------------------------- | ----- |\n"
-      "| give you up               | never |\n"
-      "| let you down              | never |\n"
-      "| run around and desert you | never |\n";
+    std::string expected = "| things to do              | when  |\n"
+                           "| ------------------------- | ----- |\n"
+                           "| give you up               | never |\n"
+                           "| let you down              | never |\n"
+                           "| run around and desert you | never |\n";
 
     std::stringstream ss;
     t.print(ss);
@@ -275,16 +263,17 @@ TEST_CASE("Predefined Custom Layout", "[predefined]") {
     Table t;
     t.layout(indented_list());
 
+    // clang-format off
     t << "things to do" << "when" << endr
       << "give you up" << "never" << endr
       << "let you down" << "never" << endr
       << "run around and desert you" << "never" << endr;
+    // clang-format on
 
-    std::string expected =
-      "  things to do                when \n"
-      "  give you up                 never\n"
-      "  let you down                never\n"
-      "  run around and desert you   never\n";
+    std::string expected = "  things to do                when \n"
+                           "  give you up                 never\n"
+                           "  let you down                never\n"
+                           "  run around and desert you   never\n";
 
     std::stringstream ss;
     t.print(ss);
@@ -295,17 +284,16 @@ TEST_CASE("Predefined Custom Layout", "[predefined]") {
     Table t;
     t.layout(markdown());
 
-    t << "things to do" << endr
-      << "give you up" << endr
-      << "let you down" << endr
-      << "run around and desert you" << endr;
+    t << "things to do" << endr               //
+      << "give you up" << endr                //
+      << "let you down" << endr               //
+      << "run around and desert you" << endr; //
 
-    std::string expected =
-      "| things to do              |\n"
-      "| ------------------------- |\n"
-      "| give you up               |\n"
-      "| let you down              |\n"
-      "| run around and desert you |\n";
+    std::string expected = "| things to do              |\n"
+                           "| ------------------------- |\n"
+                           "| give you up               |\n"
+                           "| let you down              |\n"
+                           "| run around and desert you |\n";
 
     std::stringstream ss;
     t.print(ss);
@@ -316,20 +304,21 @@ TEST_CASE("Predefined Custom Layout", "[predefined]") {
     Table t;
     t.layout(latex()).aligns({Left, Right});
 
+    // clang-format off
     t << "things to do" << "when" << endr
       << "give you up" << "never" << endr
       << "let you down" << "never" << endr
       << "run around and desert you" << "never" << endr;
-    std::string expected =
-      "\\begin{tabular}{lr}\n"
-      "\\hline\n"
-      "things to do              &  when \\\\\n"
-      "\\hline\n"
-      "give you up               & never \\\\\n"
-      "let you down              & never \\\\\n"
-      "run around and desert you & never \\\\\n"
-      "\\hline\n"
-      "\\end{tabular}\n";
+    // clang-format on
+    std::string expected = "\\begin{tabular}{lr}\n"
+                           "\\hline\n"
+                           "things to do              &  when \\\\\n"
+                           "\\hline\n"
+                           "give you up               & never \\\\\n"
+                           "let you down              & never \\\\\n"
+                           "run around and desert you & never \\\\\n"
+                           "\\hline\n"
+                           "\\end{tabular}\n";
 
     std::stringstream ss;
     t.print(ss);
@@ -337,46 +326,37 @@ TEST_CASE("Predefined Custom Layout", "[predefined]") {
   }
 }
 
-void check(const tblr::Table& t, const std::string& expected) {
-  std::stringstream ss;
-  ss << t;
-  CHECK(ss.str() == expected);
-}
-
 TEST_CASE("Edge Cases", "[edge]") {
   using namespace tblr;
   Table t;
 
-  SECTION("empty table") {
-    check(t, "");
-  }
+  SECTION("empty table") { CHECK(std::string(t) == ""); }
 
   SECTION("multiple print") {
-    t.widths({15, 6, 6, 7})
-     .aligns({Left, Center, Center, Center});
+    t.widths({15, 6, 6, 7}).aligns({Left, Center, Center, Center});
+    // clang-format off
     t << "Model" << "Precision" << "Recall" << "F-score" << endr
       << (Cell() << "my" << "Model" << 1) << 0.1 << 0.2 << 0.3 << endr
       << "a model 3" << 0.4 << 0.5 << 0.6 << endr;
-    
-    std::string expected =
-      "Model           Precis Recall F-score\n"
-      "                 ion                 \n"
-      "myModel1         0.1    0.2     0.3  \n"
-      "a model 3        0.4    0.5     0.6  \n";
+    // clang-format on
 
-    for (size_t i = 0; i < 3; i++) { check(t, expected); }
+    std::string expected = "Model           Precis Recall F-score\n"
+                           "                 ion                 \n"
+                           "myModel1         0.1    0.2     0.3  \n"
+                           "a model 3        0.4    0.5     0.6  \n";
+
+    for (size_t i = 0; i < 3; i++) { CHECK(std::string(t) == expected); }
   }
 
   SECTION("empty column") {
     t.layout(markdown());
     t << endr << endr;
 
-    std::string expected =
-      "|  |\n"
-      "|  |\n"
-      "|  |\n";
+    std::string expected = "|  |\n"
+                           "|  |\n"
+                           "|  |\n";
 
-    check(t, expected);
+    CHECK(std::string(t) == expected);
   }
 
   SECTION("newlines only") {
@@ -384,67 +364,66 @@ TEST_CASE("Edge Cases", "[edge]") {
     t.layout(layout);
     t.widths({4});
     t << "\n\n" << endr << "\n\n\n\n" << endr;
-    std::string expected =
-      "|^^^^|\n"
-      "|    |\n"
-      "|    |\n"
-      "|====|\n"
-      "|    |\n"
-      "|    |\n"
-      "|    |\n"
-      "|    |\n"
-      "|vvvv|\n";
-    check(t, expected);
+    std::string expected = "|^^^^|\n"
+                           "|    |\n"
+                           "|    |\n"
+                           "|====|\n"
+                           "|    |\n"
+                           "|    |\n"
+                           "|    |\n"
+                           "|    |\n"
+                           "|vvvv|\n";
+    CHECK(std::string(t) == expected);
   }
 
   SECTION("length mismatch") {
     t.layout(markdown());
-    t.widths({4})
-     .aligns({Right, Left});
+    t.widths({4}).aligns({Right, Left});
+    // clang-format off
     t << "a" << endr
       << "b" << "c" << "d" << endr
       << endr
       << "e" << "f" << endr;
-    std::string expected =
-      "|    a |\n"
-      "| ---- | - | - |\n"
-      "|    b | c | d |\n"
-      "|  |\n" // observe empty column (mis)alignment
-      "|    e | f |\n";
-    check(t, expected);
+    // clang-format on
+    std::string expected = "|    a |\n"
+                           "| ---- | - | - |\n"
+                           "|    b | c | d |\n"
+                           "|  |\n" // observe empty row (mis)alignment
+                           "|    e | f |\n";
+    CHECK(std::string(t) == expected);
   }
 
   SECTION("no row ending") {
+    // clang-format off
     t << "a" << "b" << "c";
+    // clang-format on
     // This effectively means that there are no rows in the table:
     // nothing to print
-    check(t, "");
+    CHECK(std::string(t) == "");
   }
 
   SECTION("table in table") {
     Table mini;
     mini.layout(markdown());
-    mini << "a" << "b" << endr
-         << "c" << "d" << endr;
+    mini << "a"
+         << "b" << endr << "c"
+         << "d" << endr;
 
     t.layout(extra_space());
-    t << mini << mini << endr
-      << mini << mini << endr;
+    t << mini << mini << endr << mini << mini << endr;
 
-    std::string expected =
-      "                        \n"
-      "  | a | b |  | a | b |  \n"
-      "  | - | - |  | - | - |  \n"
-      "  | c | d |  | c | d |  \n"
-      "                        \n"
-      "  | a | b |  | a | b |  \n"
-      "  | - | - |  | - | - |  \n"
-      "  | c | d |  | c | d |  \n"
-      "                        \n";
-    check(t, expected);
+    std::string expected = "                        \n"
+                           "  | a | b |  | a | b |  \n"
+                           "  | - | - |  | - | - |  \n"
+                           "  | c | d |  | c | d |  \n"
+                           "                        \n"
+                           "  | a | b |  | a | b |  \n"
+                           "  | - | - |  | - | - |  \n"
+                           "  | c | d |  | c | d |  \n"
+                           "                        \n";
+    CHECK(std::string(t) == expected);
   }
 }
-// clang-format on
 
 std::string strip_ansi(const std::string& s) {
   std::string rval;
@@ -523,6 +502,3 @@ TEST_CASE("ANSI color & styling", "[color]") {
     }
   }
 }
-
-// clang-format off
-// clang-format on
