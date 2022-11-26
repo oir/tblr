@@ -154,12 +154,6 @@ int main() {
                     << endr;
     // clang-format on
     std::cout << t << std::endl;
-
-    t.multiline(Naive);
-    std::cout << t << std::endl;
-
-    t.multiline(SingleLine);
-    std::cout << t << std::endl;
   }
 
   return 0;
