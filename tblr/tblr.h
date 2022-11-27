@@ -48,18 +48,114 @@ inline bool is_first_byte(const char& c) {
 }
 
 /** UTF8 length of a string */
-inline size_t len(const std::string& s) {
+inline size_t ulen(const std::string& s) {
   return std::count_if(s.begin(), s.end(), is_first_byte);
 }
 
+/// Find first ANSI escape code in string, starting from the index pos. Returns
+/// (location, size of escape code) as a two-tuple.
+inline std::tuple<size_t, size_t> find_ansi_esc(const std::string& s,
+                                                size_t pos = 0) {
+  const static std::string head("\x1b[");
+  while (pos < s.size()) {
+    size_t starter = s.find(head, pos);
+    if (starter == std::string::npos) {
+      return {std::string::npos, std::string::npos};
+    }
+    size_t i;
+    for (i = starter + head.size(); i < s.size(); i++) {
+      if (not((s[i] >= '0' and s[i] <= '9') or s[i] == ';')) { break; }
+    }
+    if (i >= s.size() or s[i] != 'm') {
+      // failed to close
+      pos = starter + head.size();
+      continue;
+    } else {
+      return {starter, i + 1 - starter};
+    }
+  }
+
+  return {std::string::npos, std::string::npos};
+}
+
+/** ANSI color code aware UTF8 length of a string */
+inline size_t clen(const std::string& s) {
+  size_t len_ = ulen(s);
+  for (size_t pos = 0; pos < s.size();) {
+    auto [left, size] = find_ansi_esc(s, pos);
+    if (left == std::string::npos) { break; }
+    len_ -= size;
+    pos = left + size;
+  }
+  return len_;
+}
+
+auto len = clen;
+
 /** UTF8 aware substring */
 inline std::string
-substr(const std::string& s, size_t left = 0, size_t size = -1) {
+usubstr(const std::string& s, size_t left = 0, size_t size = -1) {
   auto i = s.begin();
   for (left++; i != s.end() and (left -= is_first_byte(*i)); i++) {}
   auto pos = i;
   for (size++; i != s.end() and (size -= is_first_byte(*i)); i++) {}
   return s.substr(pos - s.begin(), i - pos);
+}
+
+/// ANSI color code & UTF8 aware substring.
+/// This is quadratic but probably doesn't need to be fast for now, will
+/// optimize later.
+inline std::string
+substr(const std::string& s, size_t left = 0, size_t size = -1) {
+  const static std::string reset = "\x1b[0m";
+
+  size_t last_left = -1, last_right = -1;
+  for (size_t i = left; i < s.size(); i++) {
+    if (clen(s.substr(0, i)) == left) { last_left = i; }
+  }
+  for (size_t i = last_left; i < s.size(); i++) {
+    if (clen(s.substr(0, i)) == (left + size)) {
+      last_right = i;
+      // break;
+    }
+  }
+  // collect all color codes until last_left
+  std::vector<std::string> openers;
+  for (size_t pos = 0; pos < last_left;) {
+    auto [l, sz] = find_ansi_esc(s, pos);
+    if (l + sz > last_left) { break; }
+    std::string code = s.substr(l, sz);
+    code == reset ? openers.clear() : openers.push_back(code);
+    pos = l + sz;
+  }
+
+  // wrap around with color codes if exists
+
+  // first attach color togglers from the left
+  std::string rval;
+  for (auto& c : openers) { rval += c; }
+  rval += s.substr(last_left, last_right - last_left);
+
+  // now if there are togglers in rval that are not eventually reset, we have
+  // to add reset code from the right ourselves
+  openers.clear();
+  auto [l, sz] = find_ansi_esc(rval);
+  while (l != std::string::npos) {
+    std::string code = rval.substr(l, sz);
+    code == reset ? openers.clear() : openers.push_back(code);
+    std::tie(l, sz) = find_ansi_esc(rval, l + sz);
+  }
+  if (not openers.empty()) { rval += reset; }
+
+  return rval;
+}
+
+/// ANSI color code & utf8 aware version of rfind. Returns a character index
+/// instead of byte.
+size_t crfind(const std::string& s, char c) {
+  size_t pos = s.rfind(c);
+  if (pos == std::string::npos) { return pos; }
+  return clen(s.substr(0, pos));
 }
 
 /** Replace all appearances of "\r", "\r\n" with "\n" */
@@ -219,8 +315,8 @@ class Table {
   Grid data_;
   Row cur_row_;
 
-  Widths spec_widths_; /**< Specified widths of each column */
-  Aligns spec_aligns_; /**< Specified alignment of each column */
+  Widths spec_widths_;         /**< Specified widths of each column */
+  Aligns spec_aligns_;         /**< Specified alignment of each column */
   LineSplitter split_ = Naive; /** Line splitting method */
   Layout layout_; /** Layout definition of the table, see <Layout>. */
 
@@ -229,7 +325,8 @@ class Table {
   Widths widths_;
   // bool printed_any_row_ = false; //TODO: to be used in online mode
 
-  std::stringstream ss_;
+  int precision_ = -1;
+  bool fixed_ = false;
 
   // Helpers
 
@@ -261,14 +358,14 @@ class Table {
  public:
   /// Set widths of each column. Zero means auto. If there are more
   /// columns than widths, underspecified columns default to zero.
-  Table& widths(Widths widths_) {
-    spec_widths_ = std::move(widths_);
+  Table& widths(Widths widths) {
+    spec_widths_ = std::move(widths);
     return *this;
   }
   /// Set alignments of each column. If there are more columns than
   /// alignments, underspecified columns default to Left.
-  Table& aligns(Aligns aligns_) {
-    spec_aligns_ = std::move(aligns_);
+  Table& aligns(Aligns aligns) {
+    spec_aligns_ = std::move(aligns);
     return *this;
   }
   /** Set multilineness (line splitter) of table. */
@@ -283,12 +380,12 @@ class Table {
   }
   /** Set floating point precision. */
   Table& precision(const int n) {
-    ss_ << std::setprecision(n);
+    precision_ = n;
     return *this;
   }
   /** Set fixed notation for printing floats (as opposed to default). */
   Table& fixed() {
-    ss_ << std::fixed;
+    fixed_ = true;
     return *this;
   }
 
@@ -301,21 +398,30 @@ class Table {
   /// Print the table. This is the final method to call after table contents are
   /// populated and ready to be displayed / output.
   void print(std::ostream& out = std::cout) const;
+
+  /// Cast to std::string. If there is further post processing to do that
+  /// requires a string input, this can be used to convert the whole table to a
+  /// string.
+  operator std::string() const {
+    std::ostringstream oss;
+    print(oss);
+    return oss.str();
+  }
 };
 
 template <typename T>
 Table& Table::operator<<(const T& x) {
   // insert the value into the table as a string
-  ss_ << x;
-  ss_.str(normalize_newlines(ss_.str()));
-  cur_row_.push_back(ss_.str());
+  std::stringstream ss;
+  if (precision_ > -1) { ss << std::setprecision(precision_); }
+  if (fixed_) { ss << std::fixed; }
+  ss << x;
+  ss.str(normalize_newlines(ss.str()));
+  cur_row_.push_back(ss.str());
 
   widths_.resize(std::max(widths_.size(), cur_row_.size()), 0);
   size_t& width = widths_[cur_row_.size() - 1];
-  for (std::string s; std::getline(ss_, s); width = std::max(width, len(s))) {}
-
-  ss_.str("");
-  ss_.clear();
+  for (std::string s; std::getline(ss, s); width = std::max(width, len(s))) {}
 
   return *this;
 }
@@ -379,10 +485,13 @@ inline std::string Table::print_(std::ostream& out,
     tail = substr(s, width);
     if (ls == Space) {
       // split by space
-      pos = head.rfind(' ');
+      // pos = head.rfind(' ');
+      pos = crfind(head, ' ');
       if (pos != std::string::npos) {
-        head = s.substr(0, pos);
-        tail = s.substr(pos + 1);
+        // head = s.substr(0, pos);
+        // tail = s.substr(pos + 1);
+        head = substr(s, 0, pos);
+        tail = substr(s, pos + 1);
       }
     }
   }
@@ -409,7 +518,7 @@ inline Row Table::print_row_line_(std::ostream& out, const Row& row) const {
 inline void Table::print_row_(std::ostream& out, const Row& row) const {
   static auto empty = [](const Row& row) {
     return std::all_of(
-        row.begin(), row.end(), std::mem_fn(&std::string::empty));
+        row.begin(), row.end(), [](const std::string& s) { return s.empty(); });
   };
 
   Row rval = row;
@@ -485,16 +594,13 @@ simple_border(std::string left, std::string center, std::string right) {
   return {std::move(cs), std::move(rs)};
 }
 
-/// Creates layout with markdown table syntax. Resulting table can be copy pasted
-/// into markdown. Markdown specific alignment syntax is not yet supported.
-inline Layout markdown() {
-  return simple_border("| ", " | ", " |", "-");
-}
+/// Creates layout with markdown table syntax. Resulting table can be copy
+/// pasted into markdown. Markdown specific alignment syntax is not yet
+/// supported.
+inline Layout markdown() { return simple_border("| ", " | ", " |", "-"); }
 
 /** Creates a very basic indented list layout with whitespace delimiters. */
-inline Layout indented_list() {
-  return simple_border("  ", "   ", "");
-}
+inline Layout indented_list() { return simple_border("  ", "   ", ""); }
 
 class LatexHeader : public RowSeparator {
  public:

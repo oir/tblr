@@ -240,6 +240,40 @@ std::cout << t << std::endl;
 > 
 > ```
 
+
+- ANSI color codes in tables
+
+```cpp
+const auto green = "\033[1;32m";
+const auto red = "\033[1;31m";
+const auto blue = "\033[1;34m";
+const auto underline = "\033[1;4m";
+const auto clear = "\033[0m";
+
+Table t;
+t.layout(unicode_box_light())
+    .widths({10, 10, 7})
+    .aligns({Left, Left, Right})
+    .multiline(Space);
+t << "animal" << "does what" << "when" << endr
+  << "dog" << "barks" << "angry" << endr
+  << "rooster" << "crows"
+               << (Cell() << green << "in the cool breezy morning" << clear)
+               << endr
+  << "computer" << "crashes"
+                << (Cell() << underline << red << "at warm co"
+                           << blue << "zy night" << clear)
+                << endr;
+std::cout << t << std::endl;
+```
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" width="345" height="354" srcset="color-dark.png">
+  <source media="(prefers-color-scheme: light)" width="345" height="354" srcset="color-light.png">
+  <img alt="" width="345" height="354" src="color-light.png">
+</picture>
+
+
 ## Limitations
 
 - Limited unicode support: UTF8 encoded unicode is generally supported but
