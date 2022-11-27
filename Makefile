@@ -4,7 +4,7 @@ CXX=g++
 all: test demo
 
 test: test.cpp
-	${CXX} -std=c++17 -I./tblr -I./extern test.cpp -o test
+	${CXX} -std=c++17 -fprofile-arcs -ftest-coverage -I./tblr -I./extern test.cpp -o test
 
 demo: demo.cpp
 	${CXX} -std=c++17 -I./tblr demo.cpp -o demo
