@@ -13,9 +13,9 @@ jobs:
           gcov -b -p -c test.gcno && \
           lcov -c -d . -o cov.info && \
           lcov --remove cov.info '/usr/local/include*' '*/extern/*' '*/test.cpp*' -o tblr.info
+          rm cov.info
       - name: Coveralls
         uses: coverallsapp/github-action@master
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           path-to-lcov: tblr.info
-          base-path: tblr
