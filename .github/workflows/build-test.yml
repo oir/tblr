@@ -6,7 +6,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - run: apt-get install lcov
+      - run: sudo apt-get install lcov
       - run: make -j2
       - run: ./test
       - run: |
