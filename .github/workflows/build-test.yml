@@ -6,20 +6,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
-        with:
-          python-version: '3.10'
-      - run: pip install gcovr
       - run: make -j2
       - run: ./test
       - run: |
           gcov -b -p -c test.gcno && \
-          gcovr -g -k \
-            --gcov-filter '(.*)#tblr.h(.*)' \
-            --coveralls-pretty \
-            --output cov.json
+          lcov -c -d . -o cov.info && \
+          lcov --remove cov.info '/usr/local/include*' '*/extern/*' '*/test.cpp*' -o tblr.info
       - name: Coveralls
         uses: coverallsapp/github-action@master
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          path-to-lcov: cov.json
+          path-to-lcov: tblr.info
