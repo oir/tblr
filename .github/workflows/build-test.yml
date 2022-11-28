@@ -1,0 +1,21 @@
+name: Build and run tests
+run-name: ${{ github.actor }} is testing tblr
+on: [push]
+jobs:
+  build-and-run-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - run: sudo apt-get install lcov
+      - run: make -j2
+      - run: ./test
+      - run: |
+          gcov -b -p -c test.gcno && \
+          lcov -c -d . -o cov.info && \
+          lcov --remove cov.info '/usr/local/include*' '/usr/include*' '*/extern/*' '*/test.cpp*' -o tblr.info
+          rm cov.info
+      - name: Coveralls
+        uses: coverallsapp/github-action@master
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path-to-lcov: tblr.info
