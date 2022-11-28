@@ -1,6 +1,6 @@
 <img src="tblr.png" width="143" height="146">
 
-[![Build Status](https://app.travis-ci.com/oir/tblr.svg?branch=main)](https://app.travis-ci.com/github/oir/tblr)
+[![build](https://github.com/oir/tblr/actions/workflows/build-test.yml/badge.svg)](https://github.com/oir/tblr/actions/workflows/build-test.yml) [![Coverage Status](https://coveralls.io/repos/github/oir/tblr/badge.svg?branch=main)](https://coveralls.io/github/oir/tblr?branch=main)
 
 ## tblr (Tabular)
 One header library for easy pretty printing of tables in C++. Supports markdown and latex. Use it by including `tblr.h` in your project.
