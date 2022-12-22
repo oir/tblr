@@ -90,7 +90,7 @@ inline size_t clen(const std::string& s) {
   return len_;
 }
 
-auto len = clen;
+static auto len = clen;
 
 /** UTF8 aware substring */
 inline std::string
@@ -152,14 +152,14 @@ substr(const std::string& s, size_t left = 0, size_t size = -1) {
 
 /// ANSI color code & utf8 aware version of rfind. Returns a character index
 /// instead of byte.
-size_t crfind(const std::string& s, char c) {
+inline size_t crfind(const std::string& s, char c) {
   size_t pos = s.rfind(c);
   if (pos == std::string::npos) { return pos; }
   return clen(s.substr(0, pos));
 }
 
 /** Replace all appearances of "\r", "\r\n" with "\n" */
-std::string normalize_newlines(const std::string& s) {
+inline std::string normalize_newlines(const std::string& s) {
   std::string rval;
   rval.reserve(s.size());
 
