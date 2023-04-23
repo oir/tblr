@@ -49,7 +49,7 @@ inline bool is_first_byte(const char& c) {
 
 /** UTF8 length of a string */
 inline size_t ulen(const std::string& s) {
-  return std::count_if(s.begin(), s.end(), is_first_byte);
+  return size_t(std::count_if(s.begin(), s.end(), is_first_byte));
 }
 
 /// Find first ANSI escape code in string, starting from the index pos. Returns
@@ -93,23 +93,26 @@ inline size_t clen(const std::string& s) {
 static auto len = clen;
 
 /** UTF8 aware substring */
-inline std::string
-usubstr(const std::string& s, size_t left = 0, size_t size = -1) {
+inline std::string usubstr(const std::string& s,
+                           size_t left = 0,
+                           size_t size = std::numeric_limits<size_t>::max()) {
   auto i = s.begin();
   for (left++; i != s.end() and (left -= is_first_byte(*i)); i++) {}
   auto pos = i;
   for (size++; i != s.end() and (size -= is_first_byte(*i)); i++) {}
-  return s.substr(pos - s.begin(), i - pos);
+  return s.substr(size_t(pos - s.begin()), size_t(i - pos));
 }
 
 /// ANSI color code & UTF8 aware substring.
 /// This is quadratic but probably doesn't need to be fast for now, will
 /// optimize later.
-inline std::string
-substr(const std::string& s, size_t left = 0, size_t size = -1) {
+inline std::string substr(const std::string& s,
+                          size_t left = 0,
+                          size_t size = std::numeric_limits<size_t>::max()) {
   const static std::string reset = "\x1b[0m";
 
-  size_t last_left = -1, last_right = -1;
+  size_t last_left = std::numeric_limits<size_t>::max();
+  size_t last_right = std::numeric_limits<size_t>::max();
   for (size_t i = left; i < s.size(); i++) {
     if (clen(s.substr(0, i)) == left) { last_left = i; }
   }
